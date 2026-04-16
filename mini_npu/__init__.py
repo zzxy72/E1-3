@@ -1,0 +1,2 @@
+"""Mini NPU Simulator package."""
+
