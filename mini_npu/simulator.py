@@ -94,22 +94,27 @@ class MiniNPUSimulator:
         return cross_score, x_score, predicted
 
     #region 성능 분석 관련
-    def measure_average_ms(self, func) -> float:
-        start = perf_counter()
-        for _ in range(self.repeat):
-            func()
-        end = perf_counter()
-        return (end - start) * 1000.0 / self.repeat
-
     def analyze_performance(
         self, pattern: Pattern, cross_filter: Filter, x_filter: Filter
     ) -> List[PerformanceResult]:
-        avg_2d = self.measure_average_ms(
-            lambda: (cross_filter.score(pattern), x_filter.score(pattern))
-        )
-        avg_1d = self.measure_average_ms(
-            lambda: (cross_filter.score_flat(pattern), x_filter.score_flat(pattern))
-        )
+        # 1. 2D 연산 시간 측정
+        start_2d = perf_counter()
+        for _ in range(self.repeat):
+            cross_filter.score(pattern)
+            x_filter.score(pattern)
+        end_2d = perf_counter()
+        # perf_counter()는 초(second) 단위이므로 1000.0을 곱해 밀리초(ms) 단위로 변환하고 횟수로 나눈다.
+        avg_2d = (end_2d - start_2d) * 1000.0 / self.repeat
+
+        # 2. 1D(flat) 연산 시간 측정
+        start_1d = perf_counter()
+        for _ in range(self.repeat):
+            cross_filter.score_flat(pattern)
+            x_filter.score_flat(pattern)
+        end_1d = perf_counter()
+        # 초(s) -> 밀리초(ms) 변환 (* 1000.0) 및 평균 계산
+        avg_1d = (end_1d - start_1d) * 1000.0 / self.repeat
+
         operation_count = pattern.size * pattern.size
         return [
             PerformanceResult(pattern.size, avg_2d, operation_count, self.repeat, "2D"),
