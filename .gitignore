@@ -13,5 +13,5 @@ env/
 .idea/
 
 # AI 에이전트 자동 생성 파일
-AGENT.md
+AGENTS.md
 GEMINI.md

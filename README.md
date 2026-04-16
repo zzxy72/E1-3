@@ -17,7 +17,7 @@ Mini NPU Simulator는 MAC(Multiply-Accumulate) 연산을 직접 구현해 Cross(
 ### 실행 명령
 
 ```bash
-python3 main.py
+python main.py
 ```
 
 ### 모드 선택
