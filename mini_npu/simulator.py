@@ -39,8 +39,8 @@ class MiniNPUSimulator:
     def prompt_pattern_type(self) -> str:
         while True:
             print("패턴 종류를 선택하세요.")
-            print("1. Cross")
-            print("2. X")
+            print(f"1. {STANDARD_CROSS}")
+            print(f"2. {STANDARD_X}")
             selection = input("선택: ").strip()
             if selection == "1":
                 return STANDARD_CROSS
@@ -98,7 +98,7 @@ class MiniNPUSimulator:
         self, pattern: Pattern, cross_filter: Filter, x_filter: Filter
     ) -> List[PerformanceResult]:
         # 1. 2D 연산 시간 측정
-        start_2d = perf_counter()
+        start_2d = perf_counter() # 실행 시간을 아주 정밀하게 측정하고 싶을 때 사용.
         for _ in range(self.repeat):
             cross_filter.score(pattern)
             x_filter.score(pattern)
@@ -130,8 +130,8 @@ class MiniNPUSimulator:
             return f"{result.case_id}: FAIL ({result.reason})"
 
         base = (
-            f"{result.case_id}: Cross 점수={result.cross_score:.{self.score_precision}f}, "
-            f"X 점수={result.x_score:.{self.score_precision}f}, 판정={result.predicted}, "
+            f"{result.case_id}: {STANDARD_CROSS} 점수={result.cross_score:.{self.score_precision}f}, "
+            f"{STANDARD_X} 점수={result.x_score:.{self.score_precision}f}, 판정={result.predicted}, "
             f"expected={result.expected}"
         )
         if result.passed:
@@ -184,15 +184,15 @@ class MiniNPUSimulator:
         performance_rows = self.analyze_performance(pattern, cross_filter, x_filter)
 
         print(f"\n[3] MAC 결과 - {mode_label}")
-        print(f"A 점수: {cross_score:.{self.score_precision}f}")
-        print(f"B 점수: {x_score:.{self.score_precision}f}")
+        print(f"{STANDARD_CROSS} (A) 점수: {cross_score:.{self.score_precision}f}")
+        print(f"{STANDARD_X} (B) 점수: {x_score:.{self.score_precision}f}")
         print(f"연산 시간(평균/{self.repeat}회): {performance_rows[0].avg_ms:.6f} ms")
         if predicted == UNDECIDED:
             print(f"판정: 판정 불가 (|A-B| < {self.epsilon})")
         elif predicted == STANDARD_CROSS:
-            print("판정: A")
+            print(f"판정: {STANDARD_CROSS} (A)")
         else:
-            print("판정: B")
+            print(f"판정: {STANDARD_X} (B)")
 
         print("\n[4] 성능 분석")
         print(self.format_performance_table(performance_rows))
@@ -274,10 +274,10 @@ class MiniNPUSimulator:
         print("\n[1] 기준 필터 생성")
         size = self.prompt_size()
         cross_filter, x_filter = self.build_generated_filters(size)
-        print("저장 확인: Cross/X 기준 필터 생성 완료")
-        print("A 기준 필터 = Cross")
+        print(f"저장 확인: {STANDARD_CROSS}/{STANDARD_X} 기준 필터 생성 완료")
+        print(f"A 기준 필터 = {STANDARD_CROSS}")
         self.print_matrix("A 필터:", cross_filter.values)
-        print("B 기준 필터 = X")
+        print(f"B 기준 필터 = {STANDARD_X}")
         self.print_matrix("B 필터:", x_filter.values)
 
         print("\n[2] 패턴 자동 생성")
@@ -309,7 +309,7 @@ class MiniNPUSimulator:
         for key, payload in filter_payloads.items():
             try:
                 size, _ = self.build_filter_map(key, payload)
-                print(f"size_{size} 필터 로드 완료 (Cross, X)")
+                print(f"size_{size} 필터 로드 완료 ({STANDARD_CROSS}, {STANDARD_X})")
             except Exception as error:
                 print(f"{key} 필터 로드 실패: {error}")
 
