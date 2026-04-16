@@ -38,18 +38,24 @@ E1-3/
 ├─ docs/
 │  └─ system-design.md
 └─ mini_npu/
-   ├─ constants.py
-   ├─ models.py
-   ├─ normalizer.py
-   ├─ generator.py
-   ├─ validator.py
-   ├─ mac.py
-   ├─ judge.py
-   ├─ performance.py
-   ├─ json_loader.py
-   ├─ report.py
-   └─ console.py
+   ├─ core.py
+   ├─ io.py
+   └─ simulator.py
 ```
+
+### 클래스 중심 구조
+
+- `Pattern`
+  - 입력 패턴 데이터를 표현한다.
+  - 크기, expected, case_id 같은 패턴 정보를 함께 가진다.
+
+- `Filter`
+  - Cross 또는 X 기준 필터를 표현한다.
+  - 자신의 필터 값으로 패턴 점수를 계산하는 책임을 가진다.
+
+- `MiniNPUSimulator`
+  - 사용자 입력 모드, JSON 분석 모드, 자동 생성 모드의 전체 실행 흐름을 관리한다.
+  - `Pattern`과 `Filter`를 조합해 판정과 성능 분석을 수행한다.
 
 ## 구현 요약
 
