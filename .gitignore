@@ -8,10 +8,6 @@ __pycache__/
 venv/
 env/
 
-# IDE
-.vscode/
-.idea/
-
 # AI 에이전트 자동 생성 파일
 AGENTS.md
 GEMINI.md

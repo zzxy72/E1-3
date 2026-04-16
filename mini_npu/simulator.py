@@ -220,7 +220,7 @@ class MiniNPUSimulator:
 
         filters: Dict[str, Filter] = {}
         for filter_name, matrix in value.items():
-            # expected('+', 'x')와 filter 키('cross', 'x')가 프로그램 내부에서
+            # filter 키 ('+', 'x')와 ('cross', 'x')가
             # 표준 라벨(Cross/X)로 정규화되어 비교
             normalized_name = Filter.normalize_label(filter_name)
             filter_obj = Filter(normalized_name, self.convert_matrix(matrix))
