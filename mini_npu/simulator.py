@@ -126,7 +126,7 @@ class MiniNPUSimulator:
 
     #region 결과 출력 관련
     def format_test_result(self, result: TestResult) -> str:
-        if result.cross_score is None or result.x_score is None:
+        if result.size == 0:
             return f"{result.case_id}: FAIL ({result.reason})"
 
         base = (
@@ -330,7 +330,7 @@ class MiniNPUSimulator:
                     pattern, cross_filter, x_filter
                 )
                 passed = predicted == pattern.expected
-                reason = None
+                reason = ""
                 if not passed and predicted == UNDECIDED:
                     reason = "동점 규칙으로 UNDECIDED 판정"
 
@@ -348,8 +348,8 @@ class MiniNPUSimulator:
                 result = TestResult(
                     case_id=case_id,
                     size=0,
-                    expected=None,
-                    predicted=None,
+                    expected="",
+                    predicted="",
                     passed=False,
                     reason=str(error),
                 )

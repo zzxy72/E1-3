@@ -6,7 +6,7 @@
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 Matrix = List[List[float]]
 
@@ -16,7 +16,7 @@ class Pattern:
     """입력 패턴 데이터를 표현한다."""
 
     values: Matrix
-    expected: Optional[str] = None
+    expected: str = ""
     case_id: str = ""
     # 객체 생성 시점에 1회만 계산된 1차원 데이터를 보관한다.
     flat: List[float] = field(default_factory=list, init=False, repr=False)
@@ -46,7 +46,7 @@ class Pattern:
 
     @classmethod
     def from_rows(
-        cls, rows: Matrix, expected: Optional[str] = None, case_id: str = ""
+        cls, rows: Matrix, expected: str = "", case_id: str = ""
     ) -> "Pattern":
         return cls(values=rows, expected=expected, case_id=case_id)
 
@@ -57,12 +57,12 @@ class TestResult:
 
     case_id: str
     size: int
-    expected: Optional[str]
-    predicted: Optional[str]
+    expected: str
+    predicted: str
     passed: bool
-    reason: Optional[str]
-    cross_score: Optional[float] = None
-    x_score: Optional[float] = None
+    reason: str = ""
+    cross_score: float = 0.0
+    x_score: float = 0.0
 
 
 @dataclass(frozen=True)
