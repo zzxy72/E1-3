@@ -5,7 +5,7 @@
 시스템을 설명할 때 "입력 데이터 객체"로 이해하기 쉽게 정리했다.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 Matrix = List[List[float]]
@@ -18,13 +18,22 @@ class Pattern:
     values: Matrix
     expected: Optional[str] = None
     case_id: str = ""
+    # 객체 생성 시점에 1회만 계산된 1차원 데이터를 보관한다.
+    flat: List[float] = field(default_factory=list, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        # frozen=True 이므로 object.__setattr__로 초기화한다.
+        object.__setattr__(
+            self, "flat", [value for row in self.values for value in row]
+        )
 
     @property
     def size(self) -> int:
         return len(self.values)
 
     def flatten(self) -> List[float]:
-        return [value for row in self.values for value in row]
+        # 이미 생성 시점에 변환된 캐시를 반환한다.
+        return self.flat
 
     def validate_square(self, expected_size: int) -> None:
         if len(self.values) != expected_size:

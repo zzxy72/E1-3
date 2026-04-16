@@ -5,7 +5,7 @@
 시스템을 설명할 때 "비교 기준 객체"로 이해하기 쉽게 정리했다.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 
 from mini_npu.pattern import Matrix, Pattern
@@ -21,13 +21,22 @@ class Filter:
 
     label: str
     values: Matrix
+    # 객체 생성 시점에 1회만 계산된 1차원 데이터를 보관한다.
+    flat: List[float] = field(default_factory=list, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        # frozen=True 이므로 object.__setattr__로 초기화한다.
+        object.__setattr__(
+            self, "flat", [value for row in self.values for value in row]
+        )
 
     @property
     def size(self) -> int:
         return len(self.values)
 
     def flatten(self) -> List[float]:
-        return [value for row in self.values for value in row]
+        # 이미 생성 시점에 변환된 캐시를 반환한다.
+        return self.flat
 
     def validate_square(self, expected_size: int) -> None:
         if len(self.values) != expected_size:
@@ -50,14 +59,12 @@ class Filter:
         return score
 
     def score_flat(self, pattern: Pattern) -> float:
-        flat_pattern = pattern.flatten()
-        flat_filter = self.flatten()
-        if len(flat_pattern) != len(flat_filter):
+        if len(pattern.flat) != len(self.flat):
             raise ValueError("평탄화된 패턴과 필터의 길이가 일치하지 않습니다.")
         score = 0.0
-        for index in range(len(flat_pattern)):
-            # 위치별 곱셈: 1차원으로 평탄화된 같은 위치의 값끼리 곱한다.
-            score += flat_pattern[index] * flat_filter[index]
+        for index in range(len(pattern.flat)):
+            # 순수 MAC: 이미 사전 변환된 1차원 데이터를 그대로 사용한다.
+            score += pattern.flat[index] * self.flat[index]
             # 누적 합산: 각 위치의 곱셈 결과를 score에 더한다.
         # 점수 반환: 1차원 방식으로 계산한 최종 MAC 점수를 반환한다.
         return score
