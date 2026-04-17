@@ -11,7 +11,7 @@ from time import perf_counter
 from typing import Any, Dict, List, Tuple
 
 from mini_npu.filter import Filter, STANDARD_CROSS, STANDARD_X, UNDECIDED
-from mini_npu.pattern import Matrix, Pattern, PerformanceResult, TestResult
+from mini_npu.pattern import JsonData, Matrix, Pattern, PerformanceResult, TestResult
 
 
 class MiniNPUSimulator:
@@ -23,6 +23,7 @@ class MiniNPUSimulator:
     score_precision = 10
 
     #region 입력 처리 관련
+    ### size x size 행렬을 입력
     def prompt_matrix(self, size: int, title: str) -> Matrix:
         while True:
             print(f"{title} ({size}줄 입력, 공백 구분)")
@@ -35,6 +36,39 @@ class MiniNPUSimulator:
             except ValueError as error:
                 print(error)
                 print("처음부터 다시 입력해 주세요.")
+
+    def parse_numeric_row(self, line: str, expected_size: int) -> List[float]:
+        parts = line.strip().split()
+        if len(parts) != expected_size:
+            raise ValueError(
+                f"입력 형식 오류: 각 줄에 {expected_size}개의 숫자를 공백으로 구분해 입력하세요."
+            )
+        try:
+            return [float(value) for value in parts]
+        except ValueError as exc:
+            raise ValueError("입력 형식 오류: 숫자만 입력할 수 있습니다.") from exc
+    ##########  size x size 행렬을 입력 끝
+
+    ### 보너스: 자동 패턴 생성 
+    def run_generated_mode(self) -> None:
+        print("\n[1] 기준 필터 생성")
+        size = self.prompt_size()
+        cross_filter, x_filter = self.build_generated_filters(size)
+        print(f"저장 확인: {STANDARD_CROSS}/{STANDARD_X} 기준 필터 생성 완료")
+        print(f"A 기준 필터 = {STANDARD_CROSS}")
+        self.print_matrix("A 필터:", cross_filter.values)
+        print(f"B 기준 필터 = {STANDARD_X}")
+        self.print_matrix("B 필터:", x_filter.values)
+
+        print("\n[2] 패턴 자동 생성")
+        pattern_type = self.prompt_pattern_type()
+        if pattern_type == STANDARD_CROSS:
+            pattern = Pattern.from_rows(Filter.generate_cross(size).values)
+        else:
+            pattern = Pattern.from_rows(Filter.generate_x(size).values)
+        self.print_matrix("생성된 패턴:", pattern.values)
+        
+        self.print_analysis(pattern, cross_filter, x_filter, "패턴 자동 생성")
 
     def prompt_pattern_type(self) -> str:
         while True:
@@ -61,37 +95,32 @@ class MiniNPUSimulator:
                 continue
             return size
 
-    def parse_numeric_row(self, line: str, expected_size: int) -> List[float]:
-        parts = line.strip().split()
-        if len(parts) != expected_size:
-            raise ValueError(
-                f"입력 형식 오류: 각 줄에 {expected_size}개의 숫자를 공백으로 구분해 입력하세요."
-            )
-        try:
-            return [float(value) for value in parts]
-        except ValueError as exc:
-            raise ValueError("입력 형식 오류: 숫자만 입력할 수 있습니다.") from exc
-
     def print_matrix(self, title: str, matrix: Matrix) -> None:
         print(title)
         for row in matrix:
             print(" ".join(f"{value:.0f}" for value in row))
+
+    ### 보너스: 자동 패턴 생성 끝
     #endregion
 
-    def judge_scores(self, cross_score: float, x_score: float) -> str:
-        if abs(cross_score - x_score) < self.epsilon:
-            return UNDECIDED
-        if cross_score > x_score:
-            return STANDARD_CROSS
-        return STANDARD_X
-
-    def evaluate_pattern(
-        self, pattern: Pattern, cross_filter: Filter, x_filter: Filter
-    ) -> Tuple[float, float, str]:
-        cross_score = cross_filter.score(pattern)
-        x_score = x_filter.score(pattern)
-        predicted = self.judge_scores(cross_score, x_score)
-        return cross_score, x_score, predicted
+    def evaluate_pattern_filters(
+        self, pattern: Pattern, filter_map: Dict[str, Filter]
+    ) -> Tuple[Dict[str, float], str]:
+        scores: Dict[str, float] = {}
+        for name, filter_obj in filter_map.items():
+            scores[name] = filter_obj.score(pattern)
+            
+        max_score = -1.0
+        predicted = UNDECIDED
+        
+        for name, score in scores.items():
+            if score > max_score + self.epsilon:
+                max_score = score
+                predicted = name
+            elif abs(score - max_score) <= self.epsilon:
+                predicted = UNDECIDED
+                
+        return scores, predicted
 
     #region 성능 분석 관련
     def analyze_performance(
@@ -129,9 +158,12 @@ class MiniNPUSimulator:
         if result.size == 0:
             return f"{result.case_id}: FAIL ({result.reason})"
 
+        scores_str = ", ".join([f"{name} 점수={score:.{self.score_precision}f}" for name, score in result.scores.items()])
+        if not scores_str:
+            scores_str = "점수 없음"
+
         base = (
-            f"{result.case_id}: {STANDARD_CROSS} 점수={result.cross_score:.{self.score_precision}f}, "
-            f"{STANDARD_X} 점수={result.x_score:.{self.score_precision}f}, 판정={result.predicted}, "
+            f"{result.case_id}: {scores_str}, 판정={result.predicted}, "
             f"expected={result.expected}"
         )
         if result.passed:
@@ -178,9 +210,13 @@ class MiniNPUSimulator:
         x_filter: Filter,
         mode_label: str,
     ) -> None:
-        cross_score, x_score, predicted = self.evaluate_pattern(
-            pattern, cross_filter, x_filter
-        )
+        filter_map = {
+            STANDARD_CROSS: cross_filter,
+            STANDARD_X: x_filter
+        }
+        scores, predicted = self.evaluate_pattern_filters(pattern, filter_map)
+        cross_score = scores.get(STANDARD_CROSS, 0.0)
+        x_score = scores.get(STANDARD_X, 0.0)
         performance_rows = self.analyze_performance(pattern, cross_filter, x_filter)
 
         print(f"\n[3] MAC 결과 - {mode_label}")
@@ -208,6 +244,12 @@ class MiniNPUSimulator:
     def load_json_data(self, path: str) -> Dict[str, Any]:
         with Path(path).open("r", encoding="utf-8") as file:
             return json.load(file)
+    def load_json_obj(self, path: str) -> JsonData:
+        data = self.load_json_data(path)
+        return JsonData(
+            filters=data.get("filters", {}),
+            patterns=data.get("patterns", {})
+        )
 
     def build_filter_map(self, key: str, value: Dict[str, Any]) -> Tuple[int, Dict[str, Filter]]:
         parts = key.split("_")
@@ -226,9 +268,7 @@ class MiniNPUSimulator:
             filter_obj = Filter(normalized_name, self.convert_matrix(matrix))
             filter_obj.validate_square(size)
             filters[normalized_name] = filter_obj
-
-        if STANDARD_CROSS not in filters or STANDARD_X not in filters:
-            raise ValueError(f"{key}에는 cross와 x 필터가 모두 필요합니다.")
+           
         return size, filters
 
     def build_pattern(self, case_id: str, payload: Dict[str, Any]) -> Pattern:
@@ -270,65 +310,38 @@ class MiniNPUSimulator:
 
         self.print_analysis(pattern, cross_filter, x_filter, "사용자 입력")
 
-    def run_generated_mode(self) -> None:
-        print("\n[1] 기준 필터 생성")
-        size = self.prompt_size()
-        cross_filter, x_filter = self.build_generated_filters(size)
-        print(f"저장 확인: {STANDARD_CROSS}/{STANDARD_X} 기준 필터 생성 완료")
-        print(f"A 기준 필터 = {STANDARD_CROSS}")
-        self.print_matrix("A 필터:", cross_filter.values)
-        print(f"B 기준 필터 = {STANDARD_X}")
-        self.print_matrix("B 필터:", x_filter.values)
-
-        print("\n[2] 패턴 자동 생성")
-        pattern_type = self.prompt_pattern_type()
-        if pattern_type == STANDARD_CROSS:
-            pattern = Pattern.from_rows(Filter.generate_cross(size).values)
-        else:
-            pattern = Pattern.from_rows(Filter.generate_x(size).values)
-
-        self.print_matrix("생성된 패턴:", pattern.values)
-        self.print_analysis(pattern, cross_filter, x_filter, "패턴 자동 생성")
-
     def run_json_mode(self, data_path: str) -> None:
-        # data.json의 filters/patterns를 로드
-        data = self.load_json_data(data_path)
-        filter_payloads = data.get("filters", {})
-        pattern_payloads = data.get("patterns", {})
-
-        filters_by_size: Dict[int, Dict[str, Filter]] = {}
-        filter_errors: Dict[str, str] = {}
-        for key, payload in filter_payloads.items():
-            try:
-                size, filter_map = self.build_filter_map(key, payload)
-                filters_by_size[size] = filter_map
-            except Exception as error:
-                filter_errors[key] = str(error)
-
-        print("\n[1] 필터 로드")
-        for key, payload in filter_payloads.items():
-            try:
-                size, _ = self.build_filter_map(key, payload)
-                print(f"size_{size} 필터 로드 완료 ({STANDARD_CROSS}, {STANDARD_X})")
-            except Exception as error:
-                print(f"{key} 필터 로드 실패: {error}")
+        json_obj = self.load_json_obj(data_path) # JsonData 객체 생성
+        print("\n[1] data.json 객체 로드")
+        print(f"객체 생성 완료! 타입: {type(json_obj).__name__}")
+        print(f"필터 항목 수: {len(json_obj.filters)}")
+        print(f"패턴 항목 수: {len(json_obj.patterns)}")
 
         print("\n[2] 패턴 분석")
         results: List[TestResult] = []
-        for case_id, payload in pattern_payloads.items():
-            try:
+        for case_id, size_patterns in json_obj.patterns.items():
+            try:          
                 # 패턴 키(size_{N}_{idx})에서 N을 추출해 올바른 필터를 선택
-                pattern = self.build_pattern(case_id, payload)                
-                filter_map = filters_by_size.get(pattern.size)
-                if filter_map is None:
-                    key = f"size_{pattern.size}"
-                    raise ValueError(filter_errors.get(key, f"{key} 필터가 없습니다."))
+                # print(f"case_id: {case_id}, size_patterns: {size_patterns}")
+                pattern = self.build_pattern(case_id, size_patterns) # 패턴 빌드되면서 n 사이즈 인식됨.             
+                
+                filter_key = f"size_{pattern.size}"
+                raw_filter_map = json_obj.filters.get(filter_key)  # size_n 으로 접근
 
-                cross_filter = filter_map[STANDARD_CROSS]
-                x_filter = filter_map[STANDARD_X]
-                cross_score, x_score, predicted = self.evaluate_pattern(
-                    pattern, cross_filter, x_filter
-                )
+                if raw_filter_map is None:
+                    raise ValueError(f"{filter_key} 필터가 없습니다.")
+                    
+                # 정규화된 Filter 객체로 변환
+                filter_map = {}
+                for f_name, raw_matrix in raw_filter_map.items():
+                    normalized_name = Filter.normalize_label(f_name)
+                    filter_obj = Filter(normalized_name, self.convert_matrix(raw_matrix))
+                    filter_obj.validate_square(pattern.size)
+                    filter_map[normalized_name] = filter_obj
+
+                # 다중 필터 평가, 높은 점수 판정. 허용오차 적용.
+                scores, predicted = self.evaluate_pattern_filters(pattern, filter_map)
+                
                 passed = predicted == pattern.expected
                 reason = ""
                 if not passed and predicted == UNDECIDED:
@@ -341,8 +354,7 @@ class MiniNPUSimulator:
                     predicted=predicted,
                     passed=passed,
                     reason=reason,
-                    cross_score=cross_score,
-                    x_score=x_score,
+                    scores=scores,
                 )
             except Exception as error:
                 result = TestResult(
@@ -359,12 +371,17 @@ class MiniNPUSimulator:
         print("\n[3] 성능 분석")
         performance_items: List[PerformanceResult] = []
         for size in self.supported_sizes:
-            filter_map = filters_by_size.get(size)
-            if filter_map is None:
+            raw_filter_map = json_obj.filters.get(f"size_{size}")
+            if raw_filter_map is None:
                 cross_filter, x_filter = self.build_generated_filters(size)
             else:
+                filter_map = {}
+                for f_name, raw_matrix in raw_filter_map.items():
+                    normalized_name = Filter.normalize_label(f_name)
+                    filter_map[normalized_name] = Filter(normalized_name, self.convert_matrix(raw_matrix))
                 cross_filter = filter_map[STANDARD_CROSS]
                 x_filter = filter_map[STANDARD_X]
+
             pattern = Pattern.from_rows(Filter.generate_cross(size).values)
             performance_items.extend(
                 self.analyze_performance(pattern, cross_filter, x_filter)
@@ -373,6 +390,7 @@ class MiniNPUSimulator:
 
         print()
         print(self.summarize_results(results))
+
 
     def run(self) -> None:
         print("=== Mini NPU Simulator ===")

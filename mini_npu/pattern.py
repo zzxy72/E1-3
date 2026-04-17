@@ -8,7 +8,17 @@
 from dataclasses import dataclass, field
 from typing import List
 
+from typing import Any, Dict, List
+
 Matrix = List[List[float]]
+
+
+@dataclass(frozen=True)
+class JsonData:
+    """data.json의 구조를 그대로 담는 데이터 객체"""
+    filters: Dict[str, Any]
+    patterns: Dict[str, Any]
+
 
 
 @dataclass(frozen=True)
@@ -61,8 +71,7 @@ class TestResult:
     predicted: str
     passed: bool
     reason: str = ""
-    cross_score: float = 0.0
-    x_score: float = 0.0
+    scores: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
